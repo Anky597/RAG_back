@@ -1,105 +1,95 @@
-# app/main.py
+# app/main.py (Gradio Version)
+
 import logging
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import gradio as gr # Import Gradio
 
-# Import components - initialization happens within these calls now
-from app.rag_component import get_rag_chain, initialize_vector_store, GOOGLE_API_KEY
+# Import the function that gets the chain and handles initialization implicitly
+# Ensure RAG components handles GOOGLE_API_KEY loading via os.getenv
+from app.rag_component import get_rag_chain, GOOGLE_API_KEY # Use absolute import
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
 log = logging.getLogger(__name__)
 
-# --- Initialize Flask App ---
-app = Flask(__name__)
-CORS(app)
-log.info("Flask-Cors enabled for all origins.")
-
-# --- Application State (Initialization Status) ---
-# We don't pre-initialize here anymore for local run clarity,
-# it will happen on the first call to get_rag_chain()
+# --- Application Initialization & State ---
+# Attempt to initialize components eagerly when the module is loaded
+rag_chain_instance = None
 initialization_error = None
-rag_chain_instance = None # Will be populated by get_rag_chain
-
-# --- API Endpoints ---
-@app.route("/recommend", methods=['POST'])
-def recommend_assessment():
-    global rag_chain_instance, initialization_error
-    log.debug("'/recommend' endpoint hit.")
-
-    # Try to get/initialize the chain on the first request if not done yet
-    # This block also handles checking the initialization_error state implicitly
-    try:
-        if rag_chain_instance is None and initialization_error is None:
-             log.info("RAG chain not initialized yet, attempting initialization now...")
-             rag_chain_instance = get_rag_chain() # This will build DB if needed
-             log.info("RAG chain ready.")
-    except Exception as e:
-         log.exception("ERROR during on-demand RAG initialization!")
-         initialization_error = f"On-Demand Init Failed: {type(e).__name__} - Check logs."
-         # Fall through to error handling below
-
-    # Check for initialization failure state
-    if initialization_error:
-         log.error(f"Initialization error detected. Returning 503. Error: {initialization_error}")
-         return jsonify({"error": f"Service Unavailable: {initialization_error}"}), 503
-    if not rag_chain_instance: # Should not happen if error is None, but safety check
-         log.error("RAG chain is still None after initialization attempt. Unexpected state.")
-         return jsonify({"error": "Service Unavailable: RAG components not ready."}), 503
-
-    # --- Request Validation and Processing (Same as before) ---
-    if not request.is_json:
-        # ... (return 415 error) ...
-        log.warning("Request Content-Type is not application/json.")
-        return jsonify({"error": "Request must be JSON."}), 415
-    try:
-        data = request.get_json()
-        if not data or 'question' not in data or not isinstance(data['question'], str) or not data['question'].strip():
-            # ... (return 400 error) ...
-            log.warning(f"Invalid request payload received: {data}")
-            return jsonify({"error": "Invalid request body. Required: {'question': 'your non-empty query'}."}), 400
-        question = data['question']
-        log.info(f"Processing recommendation for question: '{question[:100]}...'")
-    except Exception as e:
-         # ... (return 400 error) ...
-         log.error(f"Error parsing request JSON: {e}", exc_info=True)
-         return jsonify({"error": "Invalid JSON format in request body."}), 400
-    try:
-        result = rag_chain_instance.invoke(question)
-        log.info(f"Successfully generated recommendation for question: '{question[:100]}...'")
-        return jsonify({"answer": result}), 200
-    except Exception as e:
-        # ... (return 500 error) ...
-        log.exception(f"Error invoking RAG chain for question: '{question[:100]}...'")
-        return jsonify({"error": "An internal error occurred while processing the request."}), 500
-
-
-@app.route("/health", methods=['GET'])
-def health_check():
-    """Basic health check. Returns unhealthy if initialization failed."""
-    log.debug("'/health' endpoint hit.")
-    # Check the stored initialization error state
-    if initialization_error:
-         log.warning(f"Health check reporting unhealthy due to initialization error: {initialization_error}")
-         return jsonify({"status": "unhealthy", "reason": initialization_error}), 503
-    # If no error stored, assume basic OK for now
-    # Could add a non-blocking check here later if needed
-    return jsonify({"status": "ok"}), 200
-
-
-# --- Main execution block for LOCAL TESTING ONLY ---
-if __name__ == "__main__":
-    log.info("--- Starting Flask Development Server for Local Testing ---")
-    log.info("NOTE: Vector DB will be BUILT on the first '/recommend' request if it doesn't exist.")
-    # Ensure API key is loaded locally (dotenv should handle this)
+log.info("Gradio app module loaded. Attempting RAG component initialization (will build DB if needed)...")
+try:
+    # Check if API Key was loaded by rag_components (optional check here)
     if not GOOGLE_API_KEY:
-        log.warning("GOOGLE_API_KEY not found in environment. API calls will likely fail.")
-        print("\n*** WARNING: GOOGLE_API_KEY not found in .env file or environment! ***\n")
+        raise ValueError("GOOGLE_API_KEY environment variable not set or empty.")
 
-    # Define port for local dev server
-    local_port = int(os.environ.get("PORT", 5001)) # Use 5001 to avoid conflicts
-    log.info(f"Attempting to start server on http://0.0.0.0:{local_port}")
-    # Run the app
-    # debug=False is safer even for local testing with sensitive operations
-    app.run(host='0.0.0.0', port=local_port, debug=False)
+    # Initialize components via get_rag_chain. This triggers DB build if needed.
+    # This can be slow on startup!
+    rag_chain_instance = get_rag_chain()
+    log.info("RAG components initialization attempt finished successfully.")
+
+except Exception as e:
+    log.exception("FATAL ERROR during application startup initialization.")
+    initialization_error = f"Initialization Failed: {type(e).__name__} - Check server logs."
+    # Gradio app will still launch, but the function will fail.
+
+
+# --- Define the Core Processing Function ---
+def get_recommendation(user_question: str) -> str:
+    """Takes user question and returns RAG recommendation or error message."""
+    log.info(f"Processing request via Gradio function for: '{user_question[:100]}...'")
+
+    # Check initialization status on each call (important!)
+    if initialization_error:
+        log.error(f"Returning error due to initialization failure: {initialization_error}")
+        # You might want to raise an exception here for Gradio to catch
+        # raise gr.Error(f"Service Initialization Failed: {initialization_error}")
+        return f"Error: Service Initialization Failed - Check application logs. ({initialization_error})" # Return error string
+
+    if not rag_chain_instance:
+        log.error("RAG chain instance is not available. Initialization might have silently failed.")
+        # raise gr.Error("Service Unavailable: RAG components not ready.")
+        return "Error: Service is not ready. Please try again later or check logs."
+
+    if not user_question or not isinstance(user_question, str) or not user_question.strip():
+        log.warning("Received empty or invalid question.")
+        # raise gr.Error("Please enter a valid question.")
+        return "Error: Please enter a question."
+
+    try:
+        # Invoke the RAG chain
+        result = rag_chain_instance.invoke(user_question)
+        log.info("Successfully generated recommendation.")
+        return result # Return the answer string
+    except Exception as e:
+        log.exception(f"Error invoking RAG chain for question: '{user_question[:100]}...'")
+        # raise gr.Error(f"An internal error occurred: {e}") # Raise exception for Gradio UI
+        return f"Error: An internal processing error occurred. Check logs. ({type(e).__name__})" # Return error string
+
+
+# --- Create Gradio Interface ---
+log.info("Creating Gradio Interface...")
+# Use Blocks for more layout control if needed, Interface is simpler
+iface = gr.Interface(
+    fn=get_recommendation, # The function to call
+    inputs=gr.Textbox(lines=5, label="Your Question / Role Description", placeholder="e.g., Need cognitive tests for graduate engineers focusing on problem solving..."),
+    outputs=gr.Markdown(label="SHL Assessment Recommendation"), # Use Markdown for better text formatting
+    title="SHL RAG Assessment Recommender",
+    description="Enter your requirements below to get AI-powered SHL assessment recommendations based on product data. Initialization (including DB build) happens on startup and can take several minutes.",
+    allow_flagging="never", # Disable flagging unless you set it up
+    # examples=[ # Optionally add example queries
+    #     ["What is the OPQ?"],
+    #     ["Which assessments help evaluate suitability for remote work?"],
+    #     ["I need to assess numerical reasoning and problem-solving for graduate engineers."]
+    # ]
+)
+log.info("Gradio Interface created.")
+
+# --- Launch the Gradio App ---
+# When running in Hugging Face Spaces, HF usually handles the launch.
+# This block is mainly for local testing.
+if __name__ == "__main__":
+    log.info("Attempting to launch Gradio app locally...")
+    # HF Spaces usually uses port 7860
+    # Use share=False for local testing unless you need public link
+    iface.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    log.info("Gradio app launched.")
