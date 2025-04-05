@@ -1,0 +1,20 @@
+# Flask Web Framework & Server
+Flask
+Flask-Cors
+gunicorn
+python-dotenv
+
+# Langchain Core & Integrations
+langchain-core
+langchain-community
+langchain-google-genai
+
+# Vector Store & Embeddings
+chromadb
+sentence-transformers
+
+# Google API
+google-generativeai
+
+# Data Validation (Optional)
+# pydantic
