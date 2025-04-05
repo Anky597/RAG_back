@@ -13,3 +13,4 @@ sentence-transformers
 
 # Google API - Let pip resolve
 google-generativeai
+gradio
