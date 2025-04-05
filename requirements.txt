@@ -4,17 +4,12 @@ Flask-Cors
 gunicorn
 python-dotenv
 
-# Langchain Core & Integrations
-langchain-core
-langchain-community
-langchain-google-genai
+# Langchain - Let pip resolve compatible versions
+langchain
 
-# Vector Store & Embeddings
+# Vector Store & Embeddings - Let pip resolve
 chromadb
 sentence-transformers
 
-# Google API
+# Google API - Let pip resolve
 google-generativeai
-
-# Data Validation (Optional)
-# pydantic
