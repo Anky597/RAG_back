@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # Import components - initialization happens within these calls
-from app.rag_components import get_rag_chain, GOOGLE_API_KEY # Ensure using absolute import
+from app.rag_component import get_rag_chain, GOOGLE_API_KEY # Ensure using absolute import
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
