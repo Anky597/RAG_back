@@ -1,4 +1,4 @@
-# app/main.py (Gradio Version)
+# app/main.py (Gradio Version - NO CHANGES NEEDED FOR /run/predict)
 
 import logging
 import os
@@ -41,18 +41,14 @@ def get_recommendation(user_question: str) -> str:
     # Check initialization status on each call (important!)
     if initialization_error:
         log.error(f"Returning error due to initialization failure: {initialization_error}")
-        # You might want to raise an exception here for Gradio to catch
-        # raise gr.Error(f"Service Initialization Failed: {initialization_error}")
         return f"Error: Service Initialization Failed - Check application logs. ({initialization_error})" # Return error string
 
     if not rag_chain_instance:
         log.error("RAG chain instance is not available. Initialization might have silently failed.")
-        # raise gr.Error("Service Unavailable: RAG components not ready.")
         return "Error: Service is not ready. Please try again later or check logs."
 
     if not user_question or not isinstance(user_question, str) or not user_question.strip():
         log.warning("Received empty or invalid question.")
-        # raise gr.Error("Please enter a valid question.")
         return "Error: Please enter a question."
 
     try:
@@ -62,13 +58,11 @@ def get_recommendation(user_question: str) -> str:
         return result # Return the answer string
     except Exception as e:
         log.exception(f"Error invoking RAG chain for question: '{user_question[:100]}...'")
-        # raise gr.Error(f"An internal error occurred: {e}") # Raise exception for Gradio UI
         return f"Error: An internal processing error occurred. Check logs. ({type(e).__name__})" # Return error string
 
 
 # --- Create Gradio Interface ---
 log.info("Creating Gradio Interface...")
-# Use Blocks for more layout control if needed, Interface is simpler
 iface = gr.Interface(
     fn=get_recommendation, # The function to call
     inputs=gr.Textbox(lines=5, label="Your Question / Role Description", placeholder="e.g., Need cognitive tests for graduate engineers focusing on problem solving..."),
@@ -76,11 +70,6 @@ iface = gr.Interface(
     title="SHL RAG Assessment Recommender",
     description="Enter your requirements below to get AI-powered SHL assessment recommendations based on product data. Initialization (including DB build) happens on startup and can take several minutes.",
     allow_flagging="never", # Disable flagging unless you set it up
-    # examples=[ # Optionally add example queries
-    #     ["What is the OPQ?"],
-    #     ["Which assessments help evaluate suitability for remote work?"],
-    #     ["I need to assess numerical reasoning and problem-solving for graduate engineers."]
-    # ]
 )
 log.info("Gradio Interface created.")
 
@@ -89,7 +78,5 @@ log.info("Gradio Interface created.")
 # This block is mainly for local testing.
 if __name__ == "__main__":
     log.info("Attempting to launch Gradio app locally...")
-    # HF Spaces usually uses port 7860
-    # Use share=False for local testing unless you need public link
     iface.launch(server_name="0.0.0.0", server_port=7860, share=False)
     log.info("Gradio app launched.")
