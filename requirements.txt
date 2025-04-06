@@ -1,15 +1,20 @@
 # Flask Web Framework & Server
-
+Flask
+Flask-Cors
 gunicorn
 python-dotenv
 
-# Langchain - Let pip resolve compatible versions
-langchain
+# Langchain Core & Integrations
+langchain-core
+langchain-community
+langchain-google-genai
 
-# Vector Store & Embeddings - Let pip resolve
+# Vector Store & Embeddings
 chromadb
 sentence-transformers
 
-# Google API - Let pip resolve
+# Google API
 google-generativeai
-gradio
+
+# Optional for models.py
+# pydantic
